@@ -60,19 +60,25 @@ public class ZeebeStartEventValidationTest extends AbstractZeebeValidationTest {
             expect(SubProcess.class, "Must have exactly one start event"))
       },
       {
-        getProcessWithMultipleNoneStartEvents(),
-        singletonList(
-            expect(
-                Process.class,
-                "Must be either one none start event or multiple message/timer start events"))
+        processWithMultipleNoneStartEvents(),
+        singletonList(expect(Process.class, "Multiple none start events are not allowed"))
       },
+      {processWithNoneStartEventAndMultipleOtherStartEvents(), valid()},
     };
   }
 
-  private static BpmnModelInstance getProcessWithMultipleNoneStartEvents() {
+  private static BpmnModelInstance processWithMultipleNoneStartEvents() {
     final ProcessBuilder process = Bpmn.createExecutableProcess();
     process.startEvent().endEvent();
     process.startEvent().endEvent();
+    return process.done();
+  }
+
+  private static BpmnModelInstance processWithNoneStartEventAndMultipleOtherStartEvents() {
+    final ProcessBuilder process = Bpmn.createExecutableProcess();
+    process.startEvent().endEvent();
+    process.startEvent().timerWithCycle("R/PT1H");
+    process.startEvent().message("start");
     return process.done();
   }
 }
