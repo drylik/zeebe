@@ -74,12 +74,13 @@ public abstract class AbstractElasticsearchExporterIntegrationTestCase {
 
       int expectedNumberOfShards = 1;
       if (key.value.contains(ValueType.WORKFLOW_INSTANCE.toString())
-        || key.value.contains(ValueType.JOB.toString())) {
+          || key.value.contains(ValueType.JOB.toString())) {
         expectedNumberOfShards = 3;
       }
       assertThat(numberOfShards)
           .withFailMessage(
-              "Expected number of shards of index %s to be %d but was %d", key.value, expectedNumberOfShards, numberOfShards)
+              "Expected number of shards of index %s to be %d but was %d",
+              key.value, expectedNumberOfShards, numberOfShards)
           .isEqualTo(expectedNumberOfShards);
       assertThat(numberOfReplicas)
           .withFailMessage(
