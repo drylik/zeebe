@@ -7,6 +7,7 @@
  */
 package io.zeebe.exporter;
 
+import static io.zeebe.exporter.ElasticsearchClient.INDEX_DELIMITER;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.carrotsearch.hppc.cursors.ObjectCursor;
@@ -73,8 +74,8 @@ public abstract class AbstractElasticsearchExporterIntegrationTestCase {
       final Integer numberOfReplicas = settings.getAsInt("index.number_of_replicas", -1);
 
       int expectedNumberOfShards = 1;
-      if (key.value.toLowerCase().contains(ValueType.WORKFLOW_INSTANCE.toString().toLowerCase())
-          || key.value.toLowerCase().contains(ValueType.JOB.toString().toLowerCase())) {
+      if (key.value.toLowerCase().contains(indexDef(ValueType.WORKFLOW_INSTANCE))
+          || key.value.toLowerCase().contains(indexDef(ValueType.JOB))) {
         expectedNumberOfShards = 3;
       }
       assertThat(numberOfShards)
@@ -88,6 +89,10 @@ public abstract class AbstractElasticsearchExporterIntegrationTestCase {
               key.value, numberOfReplicas)
           .isEqualTo(0);
     }
+  }
+
+  private String indexDef(final ValueType valueType) {
+    return valueType.name().toLowerCase().replaceAll("_", "-") + INDEX_DELIMITER;
   }
 
   protected void assertRecordExported(Record<?> record) {
