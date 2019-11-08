@@ -170,7 +170,9 @@ public abstract class AbstractElasticsearchExporterIntegrationTestCase {
     }
 
     Map<String, Object> get(Record<?> record) {
-      final GetRequest request = new GetRequest(indexFor(record), typeFor(record), idFor(record));
+      final GetRequest request =
+          new GetRequest(indexFor(record), typeFor(record), idFor(record))
+              .routing(String.valueOf(record.getPartitionId()));
       try {
         final GetResponse response = client.get(request, RequestOptions.DEFAULT);
         if (response.isExists()) {
