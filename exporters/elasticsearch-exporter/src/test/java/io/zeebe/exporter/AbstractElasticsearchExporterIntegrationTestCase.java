@@ -73,8 +73,8 @@ public abstract class AbstractElasticsearchExporterIntegrationTestCase {
       final Integer numberOfReplicas = settings.getAsInt("index.number_of_replicas", -1);
 
       int expectedNumberOfShards = 1;
-      if (key.value.contains(ValueType.WORKFLOW_INSTANCE.toString())
-          || key.value.contains(ValueType.JOB.toString())) {
+      if (key.value.toLowerCase().contains(ValueType.WORKFLOW_INSTANCE.toString().toLowerCase())
+          || key.value.toLowerCase().contains(ValueType.JOB.toString().toLowerCase())) {
         expectedNumberOfShards = 3;
       }
       assertThat(numberOfShards)
