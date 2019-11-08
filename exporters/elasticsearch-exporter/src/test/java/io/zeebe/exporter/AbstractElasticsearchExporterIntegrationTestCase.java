@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.zeebe.exporter.util.ElasticsearchContainer;
 import io.zeebe.exporter.util.ElasticsearchNode;
 import io.zeebe.protocol.record.Record;
+import io.zeebe.protocol.record.ValueType;
 import io.zeebe.test.exporter.ExporterIntegrationRule;
 import io.zeebe.test.util.record.RecordingExporterTestWatcher;
 import io.zeebe.util.ZbLogger;
@@ -71,10 +72,15 @@ public abstract class AbstractElasticsearchExporterIntegrationTestCase {
       final Integer numberOfShards = settings.getAsInt("index.number_of_shards", -1);
       final Integer numberOfReplicas = settings.getAsInt("index.number_of_replicas", -1);
 
+      int expectedNumberOfShards = 1;
+      if (key.value.contains(ValueType.WORKFLOW_INSTANCE.toString())
+        || key.value.contains(ValueType.JOB.toString())) {
+        expectedNumberOfShards = 3;
+      }
       assertThat(numberOfShards)
           .withFailMessage(
-              "Expected number of shards of index %s to be 1 but was %d", key.value, numberOfShards)
-          .isEqualTo(1);
+              "Expected number of shards of index %s to be %d but was %d", key.value, expectedNumberOfShards, numberOfShards)
+          .isEqualTo(expectedNumberOfShards);
       assertThat(numberOfReplicas)
           .withFailMessage(
               "Expected number of replicas of index %s to be 0 but was %d",
