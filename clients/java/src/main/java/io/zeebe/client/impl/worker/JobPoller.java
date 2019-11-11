@@ -15,6 +15,8 @@
  */
 package io.zeebe.client.impl.worker;
 
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import io.zeebe.client.api.response.ActivatedJob;
 import io.zeebe.client.impl.Loggers;
@@ -25,6 +27,7 @@ import io.zeebe.gateway.protocol.GatewayOuterClass.ActivateJobsRequest.Builder;
 import io.zeebe.gateway.protocol.GatewayOuterClass.ActivateJobsResponse;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 
@@ -86,13 +89,33 @@ public class JobPoller implements StreamObserver<ActivateJobsResponse> {
         .forEach(jobConsumer);
   }
 
+  // last time TS of the logged Status.UNAVAILABLE StatusRuntimeException
+  private final AtomicLong lastUnavailableTs = new AtomicLong(0L);
+  private final long unavailableLogWait = Duration.ofSeconds(15).toMillis();
+
   @Override
   public void onError(Throwable throwable) {
-    LOG.warn(
-        "Failed to activated jobs for worker {} and job type {}",
-        requestBuilder.getWorker(),
-        requestBuilder.getType(),
-        throwable);
+    final boolean showLog;
+    if (throwable instanceof StatusRuntimeException
+        && ((StatusRuntimeException) throwable).getStatus().getCode()
+            == Status.UNAVAILABLE.getCode()) {
+      final long currentTs = System.currentTimeMillis();
+      final long ts =
+          lastUnavailableTs.accumulateAndGet(
+              currentTs,
+              (prevVal, newVal) -> unavailableLogWait < newVal - prevVal ? newVal : prevVal);
+      // if last time was updated to current, we show the log
+      showLog = currentTs == ts;
+    } else {
+      showLog = true;
+    }
+    if (showLog) {
+      LOG.warn(
+          "Failed to activated jobs for worker {} and job type {}",
+          requestBuilder.getWorker(),
+          requestBuilder.getType(),
+          throwable);
+    }
     pollingDone();
   }
 
