@@ -15,6 +15,8 @@
  */
 package io.zeebe.client.impl.worker;
 
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import io.zeebe.client.api.response.ActivatedJob;
 import io.zeebe.client.impl.Loggers;
@@ -25,6 +27,7 @@ import io.zeebe.gateway.protocol.GatewayOuterClass.ActivateJobsRequest.Builder;
 import io.zeebe.gateway.protocol.GatewayOuterClass.ActivateJobsResponse;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.function.Predicate;
@@ -44,6 +47,10 @@ public class JobPoller implements StreamObserver<ActivateJobsResponse> {
   private IntConsumer doneCallback;
   private int activatedJobs;
 
+  // last time TS of the logged Status.UNAVAILABLE StatusRuntimeException
+  private final AtomicLong lastUnavailableTs;
+  private final long unavailableLogWait;
+
   public JobPoller(
       GatewayStub gatewayStub,
       Builder requestBuilder,
@@ -55,6 +62,8 @@ public class JobPoller implements StreamObserver<ActivateJobsResponse> {
     this.objectMapper = objectMapper;
     this.requestTimeout = requestTimeout.toMillis();
     this.retryPredicate = retryPredicate;
+    this.lastUnavailableTs = new AtomicLong(0L);
+    this.unavailableLogWait = Duration.ofSeconds(15).toMillis();
   }
 
   private void reset() {
@@ -96,11 +105,27 @@ public class JobPoller implements StreamObserver<ActivateJobsResponse> {
     if (retryPredicate.test(throwable)) {
       poll();
     } else {
-      LOG.warn(
-          "Failed to activated jobs for worker {} and job type {}",
-          requestBuilder.getWorker(),
-          requestBuilder.getType(),
-          throwable);
+      final boolean showLog;
+      if (throwable instanceof StatusRuntimeException
+          && ((StatusRuntimeException) throwable).getStatus().getCode()
+              == Status.UNAVAILABLE.getCode()) {
+        final long currentTs = System.currentTimeMillis();
+        final long ts =
+            lastUnavailableTs.accumulateAndGet(
+                currentTs,
+                (prevVal, newVal) -> unavailableLogWait < newVal - prevVal ? newVal : prevVal);
+        // if last time was updated to current, we show the log
+        showLog = currentTs == ts;
+      } else {
+        showLog = true;
+      }
+      if (showLog) {
+        LOG.warn(
+            "Failed to activated jobs for worker {} and job type {}",
+            requestBuilder.getWorker(),
+            requestBuilder.getType(),
+            throwable);
+      }
       pollingDone();
     }
   }
